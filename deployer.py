@@ -5,6 +5,7 @@
 
 import os
 import threading
+import signal
 import socket
 import select
 import stat
@@ -109,11 +110,18 @@ def handler(conn, addr, root):
             pass
 
 def main():
+    def interrupt(signo, frame):
+        if signo == signal.SIGINT:
+            raise KeyboardInterrupt
+        else:
+            raise SystemExit
     p = argparse.ArgumentParser()
     p.add_argument('-s', '--socket', help='set control socket location',
                    default='/var/run/deployer', dest='socket')
     p.add_argument('-r', '--root', help='set script root location',
                    default='/usr/share/deployer', dest='root')
+    signal.signal(signal.SIGINT, interrupt)
+    signal.signal(signal.SIGTERM, interrupt)
     res = p.parse_args()
     sock = setup_socket(res.socket)
     while 1:
