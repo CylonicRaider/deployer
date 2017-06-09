@@ -25,11 +25,11 @@ def readline(sock):
         ch = sock.recv(1)
         if not ch:
             raise EOFError
-        elif ch == '\n':
+        elif ch == b'\n':
             break
         else:
-            sb.append(ch)
-    return ''.join(r)
+            r.append(ch)
+    return b''.join(r)
 
 def setup_socket(path):
     try:
@@ -37,9 +37,9 @@ def setup_socket(path):
     except IOError as e:
         if e.errno != errno.ENOENT:
             raise
-    sock = socket.socket()
+    sock = socket.socket(socket.AF_UNIX)
     sock.bind(path)
-    os.fchmod(sock, stat.S_IRUSR | stat.S_IWUSR)
+    os.fchmod(sock.fileno(), stat.S_IRUSR | stat.S_IWUSR)
     sock.listen(5)
     return sock
 
@@ -47,10 +47,10 @@ def handler(conn, addr, root):
     try:
         # Read request line
         request = readline(conn).split()
-        if len(request) != 2 or request[0] != 'RUN':
+        if len(request) != 2 or request[0] != b'RUN':
             conn.sendall(b'ERROR Bad request\n')
             return
-        elif '/' in request[1]:
+        elif b'/' in request[1]:
             conn.sendall(b'ERROR Bad filename\n')
             return
         # Locate script
@@ -67,34 +67,32 @@ def handler(conn, addr, root):
         proc = subprocess.Popen([path], stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0)
         # Run select loop
-        ctpbuf, ptcbuf = '', ''
-        while not eofc or not eofp:
+        ctpbuf, ptcbuf, eofc, eofp = b'', b'', False, False
+        while ctpbuf or ptcbuf or not eofc or not eofp:
             rlist, wlist = [], []
-            if eofc:
-                pass
-            elif ctpbuf:
+            if ctpbuf:
                 wlist.append(proc.stdin)
-            else:
+            elif not eofc:
                 rlist.append(conn)
-            if eofp:
-                pass
-            elif ptcbuf:
+            if ptcbuf:
                 wlist.append(conn)
-            else:
+            elif not eofp:
                 rlist.append(proc.stdout)
             nrl, nwl, nxl = select.select(rlist, wlist, ())
-            if conn in rlist:
+            if conn in nrl:
                 r = conn.recv(4096)
                 if not r: eofc = True
                 ctpbuf += r
-            if proc.stdout in rlist:
-                r = proc.stdin.read(4096)
-                if not r: eofp = True
+            if proc.stdout in nrl:
+                r = proc.stdout.read(4096)
+                if not r:
+                    eofp = True
+                    conn.shutdown(socket.SHUT_WR)
                 ptcbuf += r
-            if proc.stdin in wlist:
+            if proc.stdin in nwl:
                 n = proc.stdin.write(ctpbuf)
                 ctpbuf = ctpbuf[n:]
-            if conn in wlist:
+            if conn in nwl:
                 n = conn.send(ptcbuf)
                 ptcbuf = ptcbuf[n:]
     except EOFError:
