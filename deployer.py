@@ -122,9 +122,12 @@ def main():
     signal.signal(signal.SIGTERM, interrupt)
     res = p.parse_args()
     sock = setup_socket(res.socket)
-    while 1:
-        conn, addr = sock.accept()
-        spawn_thread(handler, conn, addr, res.root)
-        conn, addr = None, None
+    try:
+        while 1:
+            conn, addr = sock.accept()
+            spawn_thread(handler, conn, addr, res.root)
+            conn, addr = None, None
+    except (KeyboardInterrupt, SystemExit):
+        pass
 
 if __name__ == '__main__': main()
