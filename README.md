@@ -54,4 +54,4 @@ In particular, the protocol is extremely simple; the following one-liner
     echo "RUN sample.sh" | nc -U /var/run/deployer | tail -n+2
 
 runs `sample.sh` and forwards its output to the console. Note that `tail`
-may buffer its output if the output is fed into a pipeline.
+may buffer its output if it is fed into a pipeline.
