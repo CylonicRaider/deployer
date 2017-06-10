@@ -129,5 +129,10 @@ def main():
             conn, addr = None, None
     except (KeyboardInterrupt, SystemExit):
         pass
+    finally:
+        try:
+            os.unlink(res.socket)
+        except IOError:
+            pass
 
 if __name__ == '__main__': main()
