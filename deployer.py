@@ -8,6 +8,8 @@ import threading
 import signal
 import socket
 import select
+import pwd
+import grp
 import stat
 import errno
 import subprocess
@@ -174,15 +176,35 @@ def main():
         else:
             raise SystemExit
     p = argparse.ArgumentParser()
+    p.add_argument('-u', '--uid', help='switch to given UID', dest='uid')
+    p.add_argument('-g', '--gid', help='switch to given GID', dest='gid')
     p.add_argument('-s', '--socket', help='set control socket location',
                    default='/var/run/deployer', dest='socket')
     p.add_argument('-m', '--mode', help='set (octal) control socket access '
-                   'mode', default=384, type=octal, dest='mode') # 0600
+                   'mode', default=432, type=octal, dest='mode') # 0660
     p.add_argument('-r', '--root', help='set script root location',
                    default='/usr/share/deployer', dest='root')
+    res = p.parse_args()
     signal.signal(signal.SIGINT, interrupt)
     signal.signal(signal.SIGTERM, interrupt)
-    res = p.parse_args()
+    if res.gid is not None:
+        try:
+            gid = int(res.gid)
+        except ValueError:
+            try:
+                gid = grp.getgrnam(res.gid).gr_gid
+            except KeyError:
+                raise SystemExit('Unknown group: %s' % res.gid)
+        os.setgid(gid)
+    if res.uid is not None:
+        try:
+            uid = int(res.uid)
+        except ValueError:
+            try:
+                uid = pwd.getpwnam(res.uid).pw_uid
+            except KeyError:
+                raise SystemExit('Unknown user: %s' % res.uid)
+        os.setuid(uid)
     inst = Deployer(res.socket, res.mode, res.root)
     try:
         inst.main()

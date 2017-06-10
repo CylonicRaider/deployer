@@ -14,11 +14,15 @@ project name stems.
 
 `deployer` accepts the following command-line arguments:
 
+  - `-u` *user*, `--uid` *user* — *Switch user*: Change to the indicated user
+    before creating the communication socket.
+  - `-g` *group*, `--gid` *group* — *Switch group*: Change to the indicated
+    group before creating the communication socket.
   - `-s` *path*, `--socket` *path* — *Communication socket location*: Where
     to bind the (UNIX domain) socket used by clients to access `deployer`.
   - `-m` *mode*, `--mode` *mode* — *Socket access mode*: Which access bits to
-    set on the socket. May be useless as an access restriction on some
-    platforms.
+    set on the socket. The default mode is `0660`. May be useless as an
+    access restriction on some platforms.
   - `-r` *path*, `--root` *path* — *Script directory*: Where the programs to
     be run are located.
 
