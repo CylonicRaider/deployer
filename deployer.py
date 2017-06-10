@@ -38,6 +38,8 @@ class Deployer:
         self.scriptroot = scriptroot
         self.cond = threading.Condition()
         self._running = {}
+        self._following = {}
+        self._nextid = 0
         self.socket = None
     def setup_socket(self):
         try:
@@ -72,18 +74,32 @@ class Deployer:
             elif not os.access(path, os.X_OK):
                 conn.sendall(b'ERROR Permission denied\n')
                 return
-            # Start it
+            # Determine if (and when) we are going to run it
             sent_ok = False
             with self.cond:
-                while self._running.get(path):
-                    if not sent_ok:
-                        conn.sendall(b'OK WAIT\n')
+                # Grab a waiting number
+                this_id = self._nextid
+                self._nextid += 1
+                # Relieve any pending thread
+                self._following[path] = this_id
+                self.cond.notifyAll()
+                # Wait until the previous instance (if any) is done
+                while 1:
+                    if self._following[path] != this_id:
+                        # Someone came after us; bye
+                        return
+                    elif not self._running.get(path):
+                        # Our turn!
+                        if not sent_ok: conn.sendall(b'OK\n')
+                        break
+                    else:
+                        # We have to wait
+                        if not sent_ok: conn.sendall(b'OK WAIT\n')
                         sent_ok = True
                     self.cond.wait()
-                running = path
                 self._running[path] = True
-            if not sent_ok:
-                conn.sendall(b'OK\n')
+                running = path
+            # Start it
             proc = subprocess.Popen([path], stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0)
             # Run select loop
