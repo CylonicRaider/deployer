@@ -32,8 +32,9 @@ def readline(sock):
     return b''.join(r)
 
 class Deployer:
-    def __init__(self, sockpath, scriptroot):
+    def __init__(self, sockpath, sockmode, scriptroot):
         self.sockpath = sockpath
+        self.sockmode = sockmode
         self.scriptroot = scriptroot
         self.socket = None
     def setup_socket(self):
@@ -44,7 +45,8 @@ class Deployer:
                 raise
         self.socket = socket.socket(socket.AF_UNIX)
         self.socket.bind(self.sockpath)
-        os.fchmod(self.socket.fileno(), stat.S_IRUSR | stat.S_IWUSR)
+        # Cannot fchmod() socket as the bind() applies the umask.
+        os.chmod(self.sockpath, self.sockmode)
         self.socket.listen(5)
         return self.socket
     def handler(self, conn, addr):
@@ -130,6 +132,8 @@ class Deployer:
             pass
 
 def main():
+    def octal(s):
+        return int(s, 8)
     def interrupt(signo, frame):
         if signo == signal.SIGINT:
             raise KeyboardInterrupt
@@ -138,12 +142,14 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('-s', '--socket', help='set control socket location',
                    default='/var/run/deployer', dest='socket')
+    p.add_argument('-m', '--mode', help='set (octal) control socket access '
+                   'mode', default=384, type=octal, dest='mode') # 0600
     p.add_argument('-r', '--root', help='set script root location',
                    default='/usr/share/deployer', dest='root')
     signal.signal(signal.SIGINT, interrupt)
     signal.signal(signal.SIGTERM, interrupt)
     res = p.parse_args()
-    inst = Deployer(res.socket, res.root)
+    inst = Deployer(res.socket, res.mode, res.root)
     try:
         inst.main()
     except (KeyboardInterrupt, SystemExit):
