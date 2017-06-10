@@ -36,6 +36,8 @@ class Deployer:
         self.sockpath = sockpath
         self.sockmode = sockmode
         self.scriptroot = scriptroot
+        self.cond = threading.Condition()
+        self._running = {}
         self.socket = None
     def setup_socket(self):
         try:
@@ -50,6 +52,7 @@ class Deployer:
         self.socket.listen(5)
         return self.socket
     def handler(self, conn, addr):
+        running = None
         try:
             # Read request line
             request = readline(conn).split()
@@ -61,7 +64,8 @@ class Deployer:
                 return
             # Locate script
             # You don't use UTF-8? Shame upon yourself!
-            path = os.path.join(self.scriptroot.encode('utf-8'), request[1])
+            path = os.path.abspath(os.path.join(
+                self.scriptroot.encode('utf-8'), request[1]))
             if not os.path.isfile(path):
                 conn.sendall(b'ERROR No such file or directory\n')
                 return
@@ -69,7 +73,17 @@ class Deployer:
                 conn.sendall(b'ERROR Permission denied\n')
                 return
             # Start it
-            conn.sendall(b'OK\n')
+            sent_ok = False
+            with self.cond:
+                while self._running.get(path):
+                    if not sent_ok:
+                        conn.sendall(b'OK WAIT\n')
+                        sent_ok = True
+                    self.cond.wait()
+                running = path
+                self._running[path] = True
+            if not sent_ok:
+                conn.sendall(b'OK\n')
             proc = subprocess.Popen([path], stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0)
             # Run select loop
@@ -104,6 +118,10 @@ class Deployer:
         except EOFError:
             pass
         finally:
+            if running is not None:
+                with self.cond:
+                    self._running[running] = False
+                    self.cond.notifyAll()
             try:
                 conn.shutdown(socket.SHUT_RDWR)
             except IOError:
