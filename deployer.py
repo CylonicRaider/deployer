@@ -12,6 +12,7 @@ import pwd
 import grp
 import stat
 import errno
+import logging
 import subprocess
 import argparse
 
@@ -34,10 +35,11 @@ def readline(sock):
     return b''.join(r)
 
 class Deployer:
-    def __init__(self, sockpath, sockmode, scriptroot):
+    def __init__(self, sockpath, scriptroot, sockmode=None, logger=None):
         self.sockpath = sockpath
-        self.sockmode = sockmode
         self.scriptroot = scriptroot
+        self.sockmode = sockmode
+        self.logger = logger
         self.cond = threading.Condition()
         self._running = {}
         self._following = {}
@@ -52,8 +54,10 @@ class Deployer:
         self.socket = socket.socket(socket.AF_UNIX)
         self.socket.bind(self.sockpath)
         # Cannot fchmod() socket as the bind() applies the umask.
-        os.chmod(self.sockpath, self.sockmode)
+        if self.sockmode is not None: os.chmod(self.sockpath, self.sockmode)
         self.socket.listen(5)
+        if self.logger:
+            self.logger.info('Listening on %r' % (self.sockpath,))
         return self.socket
     def handler(self, conn, addr):
         running = None
@@ -158,6 +162,8 @@ class Deployer:
         finally:
             self.cleanup_socket()
     def cleanup_socket(self):
+        if self.logger:
+            self.logger.info('Closing')
         try:
             self.socket.close()
         except (AttributeError, socket.error):
@@ -184,7 +190,13 @@ def main():
                    'mode', default=432, type=octal, dest='mode') # 0660
     p.add_argument('-r', '--root', help='set script root location',
                    default='/usr/share/deployer', dest='root')
+    p.add_argument('-L', '--loglevel', help='set logging level',
+                   dest='loglevel', default='INFO')
+    p.add_argument('-v', '--verbose', help='set logging level to DEBUG',
+                   action='store_const', dest='loglevel', const='DEBUG')
     res = p.parse_args()
+    logging.basicConfig(format='[%(asctime)s %(name)s %(levelname)s] '
+            '%(message)s', datefmt='%Y-%m-%d %H:%M:%S', level=res.loglevel)
     signal.signal(signal.SIGINT, interrupt)
     signal.signal(signal.SIGTERM, interrupt)
     if res.gid is not None:
@@ -205,7 +217,7 @@ def main():
             except KeyError:
                 raise SystemExit('Unknown user: %s' % res.uid)
         os.setuid(uid)
-    inst = Deployer(res.socket, res.mode, res.root)
+    inst = Deployer(res.socket, res.root, res.mode, logging)
     try:
         inst.main()
     except (KeyboardInterrupt, SystemExit):
