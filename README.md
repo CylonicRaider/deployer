@@ -45,7 +45,9 @@ A session of some client with `deployer` looks as follows:
       - `OK`: The script was found and will run immediately.
       - `OK WAIT`: The script was found, but is already running. This request
         will either run later or not at all if another client requests it
-        before the instance running in the background finishes.
+        before the instance running in the background finishes. **Note** that
+        the client cannot determine whether the script has not run at all or
+        just produced no output.
       - `ERROR <message>`: Some stage of preparing to run the script failed;
         the `<message>` contains a short explanation of the error.
  4. If the script actually runs, the server relays any output (both standard
@@ -57,9 +59,9 @@ A session of some client with `deployer` looks as follows:
     or may not make sense.
  6. Finally, the client closes the connection.
 
-In particular, the protocol is extremely simple; the following one-liner
+The protocol is very simple; the following one-liner
 
     echo "RUN sample.sh" | nc -U /var/run/deployer | tail -n+2
 
 runs `sample.sh` and forwards its output to the console. Note that `tail`
-may buffer its output if it is fed into a pipeline.
+may buffer its output if that is fed into a pipeline.
