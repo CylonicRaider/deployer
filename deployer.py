@@ -60,28 +60,37 @@ class Deployer:
             self.logger.info('Listening on %r' % (self.sockpath,))
         return self.socket
     def handler(self, conn, addr):
-        running = None
+        def format_request(l):
+            return repr(tuple(i.decode('utf-8', errors='replace')
+                        for i in l))
+        def respond(line):
+            if responded[0]: return
+            responded[0] = True
+            if self.logger:
+                self.logger.info('%s -> %r' % (format_request(request),
+                                               line))
+            conn.sendall(line.encode('ascii') + b'\n')
+        running, responded = None, [False]
         try:
             # Read request line
             request = readline(conn).split()
             if len(request) != 2 or request[0] != b'RUN':
-                conn.sendall(b'ERROR Bad request\n')
+                respond('ERROR Bad request')
                 return
             elif b'/' in request[1]:
-                conn.sendall(b'ERROR Bad filename\n')
+                respond('ERROR Bad filename')
                 return
             # Locate script
             # You don't use UTF-8? Shame upon yourself!
             path = os.path.abspath(os.path.join(
                 self.scriptroot.encode('utf-8'), request[1]))
             if not os.path.isfile(path):
-                conn.sendall(b'ERROR No such file or directory\n')
+                respond('ERROR No such file or directory')
                 return
             elif not os.access(path, os.X_OK):
-                conn.sendall(b'ERROR Permission denied\n')
+                respond('ERROR Permission denied')
                 return
             # Determine if (and when) we are going to run it
-            sent_ok = False
             with self.cond:
                 # Grab a waiting number
                 this_id = self._nextid
@@ -96,12 +105,11 @@ class Deployer:
                         return
                     elif not self._running.get(path):
                         # Our turn!
-                        if not sent_ok: conn.sendall(b'OK\n')
+                        respond('OK')
                         break
                     else:
                         # We have to wait
-                        if not sent_ok: conn.sendall(b'OK WAIT\n')
-                        sent_ok = True
+                        respond('OK WAIT')
                     self.cond.wait()
                 self._running[path] = True
                 running = path
@@ -192,8 +200,6 @@ def main():
                    default='/usr/share/deployer', dest='root')
     p.add_argument('-L', '--loglevel', help='set logging level',
                    dest='loglevel', default='INFO')
-    p.add_argument('-v', '--verbose', help='set logging level to DEBUG',
-                   action='store_const', dest='loglevel', const='DEBUG')
     res = p.parse_args()
     logging.basicConfig(format='[%(asctime)s %(name)s %(levelname)s] '
             '%(message)s', datefmt='%Y-%m-%d %H:%M:%S', level=res.loglevel)
