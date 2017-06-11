@@ -25,6 +25,10 @@ project name stems.
     access restriction on some platforms.
   - `-r` *path*, `--root` *path* — *Script directory*: Where the programs to
     be run are located.
+  - `-L` *level*, `--loglevel` *level* — *Logging level*: At which level of
+    detail to log (to stderr). Possible values are `DEBUG`, `INFO`,
+    `WARNING`, `ERROR`, `CRITICAL`; however, only `INFO`-level messages are
+    actually produced (so far) and exceptions are reported unconditionally.
 
 Scripts must be located directly inside `root` and be have the executable bit
 set to be run successfully.
