@@ -200,9 +200,16 @@ def main():
                    default='/usr/share/deployer', dest='root')
     p.add_argument('-L', '--loglevel', help='set logging level',
                    dest='loglevel', default='INFO')
+    p.add_argument('--no-timestamps', action='store_true',
+                   help='no timestamps on logs', dest='no_timestamps')
     res = p.parse_args()
-    logging.basicConfig(format='[%(asctime)s %(name)s %(levelname)s] '
-            '%(message)s', datefmt='%Y-%m-%d %H:%M:%S', level=res.loglevel)
+    if res.no_timestamps:
+        logging.basicConfig(format='[%(name)s %(levelname)s] '
+                '%(message)s', level=res.loglevel)
+    else:
+        logging.basicConfig(format='[%(asctime)s %(name)s %(levelname)s] '
+                '%(message)s', datefmt='%Y-%m-%d %H:%M:%S',
+                level=res.loglevel)
     signal.signal(signal.SIGINT, interrupt)
     signal.signal(signal.SIGTERM, interrupt)
     if res.gid is not None:
