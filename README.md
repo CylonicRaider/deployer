@@ -2,13 +2,13 @@
 
 A centralized serializing script runner.
 
-`deployer` is a (`centralized`) server overseeing the execution of a set of
+`deployer` is a (*centralized*) server overseeing the execution of a set of
 programs (for example shell scripts) and ensuring that the same program is
-never run twice at the same time (`serializing`). Furthermore, the programs
-are assumed to be “postidempotent”, _i.e._ that the result of a sequence of
-invocations is equivalent to that of the *last* one; this is applicable to,
-for example, well-behaved software deployment procedures, from which the
-project name stems.
+never run twice at the same time (*serializing*). The programs are assumed to
+be “postidempotent”, _i.e._, that the result of a sequence of invocations is
+equivalent to that of the *last* one; this is applicable to, for example,
+well-behaved software deployment procedures, from which the project name
+stems.
 
 ## Usage
 
@@ -30,8 +30,8 @@ project name stems.
     `WARNING`, `ERROR`, `CRITICAL`; however, only `INFO`-level messages are
     actually produced (so far) and exceptions are reported unconditionally.
 
-Scripts must be located directly inside `root` and be have the executable bit
-set to be run successfully.
+Scripts must be located directly inside `root` and have the executable bit set
+to be run successfully.
 
 ## Communication
 
@@ -43,20 +43,20 @@ A session of some client with `deployer` looks as follows:
     of passing arguments.
  3. The server replies with a line consisting of:
       - `OK`: The script was found and will run immediately.
-      - `OK WAIT`: The script was found, but is already running. This request
-        will either run later or not at all if another client requests it
-        before the instance running in the background finishes. **Note** that
-        the client cannot determine whether the script has not run at all or
-        just produced no output.
+      - `OK WAIT`: The script was found, but is already running. The script
+        will run for this request either later or not at all if another client
+        requests it before the instance running in the background finishes.
+        **Note** that the client cannot determine whether the script has not
+        run at all or just produced no output.
       - `ERROR <message>`: Some stage of preparing to run the script failed;
         the `<message>` contains a short explanation of the error.
  4. If the script actually runs, the server relays any output (both standard
     output and standard error) from the script to the client and any data
     received from the client to the script's standard input.
- 5. Once the script finishes running `deployer` shuts down the corresponding
+ 5. Once the script finishes running, `deployer` shuts down the corresponding
     half of the connection to let the client know the script is done. As the
-    script may close its standard output otherwise, still sending data may
-    or may not make sense.
+    script might close its standard output otherwise, sending more data to it
+    may or may not make sense.
  6. Finally, the client closes the connection.
 
 The protocol is very simple; the following one-liner
